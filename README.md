@@ -3,17 +3,17 @@
 Create [Cycle.js](https://cycle.js.org/) apps which render on the HTML Canvas intelligently.
 This module creates a driver which renders to the canvas when provided a state stream from the app.
 It also provides components which help interpret the mouse intent on the canvas, filtered according to the state provided to the driver.
-The state is intended to be a [unist](https://github.com/syntax-tree/unist) tree with [frame.js](https://github.com/mvarble/frames.js) nodes, as these provide intuitive coordinate systems for encapsulating objects and relative positions thereof.
+The state is intended to be a [unist](https://github.com/syntax-tree/unist) tree with [frames.js](https://github.com/mvarble/frames.js) nodes, as these provide intuitive coordinate systems for encapsulating objects and relative positions thereof.
 It is required that this `state` object has a `state.id` field, corresponding to the id attribute on the DOM object corresponding to the HTML Canvas.
 
 ## Example
 
-Suppose I want to render my canvas to look like the image below.
+Suppose I want to render my canvas to animate like the gif below,
 
-![canvas example](https://github.com/mvarble/viewport.js/blob/master/example.png),
+![canvas example](https://github.com/mvarble/viewport.js/blob/master/example.gif)
 
-but I would like that number `4` to change every second and rotate around the text at 10 rad/sec at a refresh rate of 60hz.
-I would start by framing my state to look as follows.
+I would start by considering what the state looks like at any time.
+For instance, I may choose that the state is as follows at the initial time,
 
 ```js
 {
@@ -24,13 +24,13 @@ I would start by framing my state to look as follows.
   children: [
     {
       type: 'textbox',
-      data: { value: 'This is the time:' },
+      data: { value: 'Seconds elapsed:' },
       worldMatrix: [[100, 0, 300], [0, -100, 100], [0, 0, 1]],
     },
     {
       type: 'textbox',
-      worldMatrix: [[100, 0, 350], [0, -100, 150], [0, 0, 1]],
-      data: { value: '4' },
+      worldMatrix: [[100, 0, 390], [0, -100, 100], [0, 0, 1]],
+      data: { value: '0' },
     },
   }],
 }
@@ -42,29 +42,36 @@ My [Cycle.js](https://cycle.js.org/) app will now be as simple as
 ```js
 const title = {
   type: 'textbox',
-  data: { value: 'This is the time:' },
+  data: { value: 'Seconds elapsed:' },
   worldMatrix: [[100, 0, 300], [0, -100, 100], [0, 0, 1]],
 };
 const startText = {
-  type: 'textbox'
-  worldMatrix: [[100, 0, 350], [0, -100, 150], [0, 0, 1]],
+  type: 'textbox',
+  worldMatrix: [[100, 0, 390], [0, -100, 100], [0, 0, 1]],
 };
 
 function app(sources) {
-  const time$ = xs.periodic(1000).map(x => x + 4);
-  const theta$ = xs.periodic(16.67).map(t => t/6.);
-  const text$ = xs.combine(time$, theta$).map(([x, t]) => {
-    const frame = frames.rotatedFrame(startText, t, title);
-    frame.data = { value: '' + x };
-    return frame;
-  });
-  const tree$ = text$.map(textNode => ({
+  // this is a timer for drawing 24fps
+  const time$ = xs.periodic(1000 / 24.).map(f => f/24.);
+
+  // use the timer to edit the node in the tree responsible for the number
+  // the node should revolve around the text once every 6-seconds.
+  const text$ = time$.map(time => {
+    const node = frames.rotatedFrame(startText, -time * 2 * Math.PI / 6, title);
+    node.data = { value: '' + Math.floor(time) };
+    return node;
+  }).take(6 * 24);
+
+  // build the unist tree from the changing node
+  const tree$ = text$.map(node => ({
     type: 'root',
     id: 'canvas',
     width: 800,
     height: 200,
-    children: [title, textNode],
+    children: [title, node],
   }));
+
+  // return the sink to the viewport driver
   return { viewport: tree$ };
 }
 ```
@@ -76,11 +83,14 @@ const driver = makeViewportDriver(renderFunc);
 
 function renderFunc(canvas, state) {
   const context = canvas.getContext('2d');
+  context.fillStyle = 'white';
+  context.fillRect(0, 0, 800, 200);
   const identity = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  context.fillStyle = 'black';
   state.children.forEach(child => {
     const loc = frames.locFrameTrans([0, 0], child, { worldMatrix: identity });
     context.fillText(child.data.value, ...loc, 100, 100);
-  })
+  });
 }
 ```
 

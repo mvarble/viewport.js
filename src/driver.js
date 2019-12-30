@@ -40,6 +40,7 @@ function makeViewportDriver(renderState, vdomSelector) {
   // stream: mutations of the vdom
   const mutations$ = xs.create({
     start: listener => {
+      if (!document) return;
       const observer = new MutationObserver(() => listener.next());
       if (vdomSelector) {
         const dom = document.querySelector(vdomSelector);
@@ -112,9 +113,10 @@ function makeViewportDriver(renderState, vdomSelector) {
      * said dimensions. This is checked every time the domChange$ fires or 
      * window resizes.
      */
+    const windowResize$ = window ? fromEvent(window, 'resize') : xs.empty();
     const resizesRaw$ = xs.combine(
       domChange$, 
-      xs.merge(xs.of(undefined), fromEvent(window, 'resize'))
+      xs.merge(xs.of(undefined), windowResize$)
     ).map(([canvasesObj, _]) => Object.keys(canvasesObj).reduce((acc, id) => {
         const canvas = canvasesObj[id];
         const { offsetWidth, offsetHeight } = canvas.parentNode;
