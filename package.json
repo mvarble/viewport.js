@@ -1,0 +1,33 @@
+{
+  "name": "@mvarble/viewport.js",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "node build",
+    "test": "./node_modules/mocha/bin/mocha --require @babel/register"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mvarble/viewport.js.git"
+  },
+  "author": "Matthew Varble",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mvarble/viewport.js/issues"
+  },
+  "homepage": "https://github.com/mvarble/viewport.js#readme",
+  "dependencies": {
+    "@mvarble/frames.js": "^1.0.1",
+    "mathjs": "^6.2.3",
+    "unist-util-visit": "^2.0.0",
+    "xstream": "^11.11.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.7.7",
+    "@babel/preset-env": "^7.7.7",
+    "babel-loader": "^8.0.6",
+    "webpack": "^4.41.5",
+    "webpack-node-externals": "^1.7.2"
+  }
+}
