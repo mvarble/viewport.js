@@ -113,14 +113,11 @@ The returned `driver` is a [Cycle.js](https://cycle.js.org/) driver which will p
 One provides the function `renderFunc` such that `renderFunc(canvas, state)` renders `state` on the DOM element `canvas`.
 The driver is simply responsible for searching the dom for the canvas and running this function accordingly.
 
-The driver also returns sources for the mounted app; the source will be an object of the following form.
+The driver also returns sources for the mounted app; the source will be an object with the following keys.
 
-```js
-{
-  mounted: Stream<id>,
-  resize: Stream<{ id, dims }>,
-}
-```
+|---|---|
+| mounted | Stream<id> | 
+| resize | Stream<{ id, dims }> | 
 
 The `mounted` stream will fire a value `id` corresponding to a value `state.id` that was provided to the driver and has been successfully found in the DOM by the driver.
 The driver will repeatedly look for the appropriate DOM element for mounting purposes, so one may optimize searches by providing the optional argument `vdomSelector` to allow the driver to only observe a subset of the DOM tree for mutations.
@@ -184,25 +181,22 @@ The inputted `viewport` should have a `viewport.events` method, as exported by t
 From here, mouse object will have things like `mouse.click` which is an alias for the `viewport.events('click')`, along with some other interpretted streams that do not correspond to the usual DOM events.
 A summary of the `mouse` fields is below.
 
-```js
-{
-  click: corresponding to the `click` event,
-  mousemove: corresponding to the `mousemove` event,
-  mouseleave: corresponding to the `mouseleave` event,
-  wheel: corresponding to the `wheel` event,
-  mousedown: corresponding to the `mousedown` event,
-  mouseup: corresponding to the `mouseup` event,
-  lMousedown: the `mousedown` event, filtered for left-clicks,
-  lMouseup: the `mouseup` event, filtered for left-clicks,
-  rMousedown: the `mousedown` event, filtered for right-clicks,
-  rMouseup: the `mouseup` event, filtered for right-clicks,
-  mMousedown: the `mousedown` event, filtered for middle-clicks,
-  mMouseup: the `mouseup` event, filtered for middle-clicks,
-  singleclick: the `click` events, filtered by appropriate timing and little movement,
-  doubleclick: the `click` events, filtered by those that happened in quick succession,
-  drag: this is a stream of streams; each stream will be `mousemove` events and a terminating `mouseup` event that follow when one is holding the mouse down.
-}
-```
+|---|---|
+| click | corresponding to the `click` event |
+| mousemove |  corresponding to the `mousemove` event | 
+| mouseleave |  corresponding to the `mouseleave` event | 
+| wheel |  corresponding to the `wheel` event | 
+| mousedown |  corresponding to the `mousedown` event | 
+| mouseup |  corresponding to the `mouseup` event | 
+| lMousedown |  the `mousedown` event, filtered for left-clicks | 
+| lMouseup |  the `mouseup` event, filtered for left-clicks | 
+| rMousedown |  the `mousedown` event, filtered for right-clicks | 
+| rMouseup |  the `mouseup` event, filtered for right-clicks | 
+| mMousedown |  the `mousedown` event, filtered for middle-clicks | 
+| mMouseup |  the `mouseup` event, filtered for middle-clicks | 
+| singleclick |  the `click` events, filtered by appropriate timing and little movement | 
+| doubleclick |  the `click` events, filtered by those that happened in quick succession | 
+| drag |  this is a stream of streams; each stream will be `mousemove` events and a terminating `mouseup` event that follow when one is holding the mouse down. | 
 
 #### FilteredMouse
 
