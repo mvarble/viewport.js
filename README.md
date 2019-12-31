@@ -51,8 +51,8 @@ const startText = {
 };
 
 function app(sources) {
-  // this is a timer for drawing 24fps
-  const time$ = xs.periodic(1000 / 24.).map(f => f/24.);
+  // this is a timer that emits elapsed time at 24hz for 6 seconds.
+  const time$ = xs.periodic(1000 / 24.).map(f => f/24.).take(6 * 24);
 
   // use the timer to edit the node in the tree responsible for the number
   // the node should revolve around the text once every 6-seconds.
@@ -60,7 +60,7 @@ function app(sources) {
     const node = frames.rotatedFrame(startText, -time * 2 * Math.PI / 6, title);
     node.data = { value: '' + Math.floor(time) };
     return node;
-  }).take(6 * 24);
+  });
 
   // build the unist tree from the changing node
   const tree$ = text$.map(node => ({

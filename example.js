@@ -1,5 +1,4 @@
 const xs = require('xstream').default;
-const sampleCombine = require('xstream/extra/sampleCombine').default;
 const frames = require('@mvarble/frames.js');
 const { run } = require('@cycle/run');
 const GIFEncoder = require('gifencoder');
