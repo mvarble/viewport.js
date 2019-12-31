@@ -115,6 +115,7 @@ The driver is simply responsible for searching the dom for the canvas and runnin
 
 The driver also returns sources for the mounted app; the source will be an object with the following keys.
 
+| tag | signature |
 |---|---|
 | mounted | Stream<id> | 
 | resize | Stream<{ id, dims }> | 
@@ -181,6 +182,7 @@ The inputted `viewport` should have a `viewport.events` method, as exported by t
 From here, mouse object will have things like `mouse.click` which is an alias for the `viewport.events('click')`, along with some other interpretted streams that do not correspond to the usual DOM events.
 A summary of the `mouse` fields is below.
 
+| tag | summary |
 |---|---|
 | click | corresponding to the `click` event |
 | mousemove |  corresponding to the `mousemove` event | 
