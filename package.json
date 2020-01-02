@@ -11,7 +11,7 @@
     "url": "git+https://github.com/mvarble/viewport.js.git"
   },
   "author": "Matthew Varble",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/mvarble/viewport.js/issues"
   },

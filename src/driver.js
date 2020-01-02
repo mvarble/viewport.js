@@ -40,7 +40,6 @@ function makeViewportDriver(renderState, vdomSelector) {
   // stream: mutations of the vdom
   const mutations$ = xs.create({
     start: listener => {
-      if (!document) return;
       const observer = new MutationObserver(() => listener.next());
       if (vdomSelector) {
         const dom = document.querySelector(vdomSelector);

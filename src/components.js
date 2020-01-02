@@ -10,6 +10,9 @@ import sampleCombine from 'xstream/extra/sampleCombine';
 import fromEvent from 'xstream/extra/fromEvent';
 import * as math from 'mathjs';
 
+// module dependencies: project modules
+import { isOver } from './utils';
+
 /**
  * MouseObject
  *
