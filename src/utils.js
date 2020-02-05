@@ -6,8 +6,28 @@
 
 // module dependencies: npm packages
 import * as math from 'mathjs';
+import xs from 'xstream';
+import fromEvent from 'xstream/extra/fromEvent';
+import dropRepeats from 'xstream/extra/dropRepeats';
 import visit from 'unist-util-visit';
 import { locFrameTrans } from '@mvarble/frames.js';
+
+/**
+ * parentSize
+ *
+ * This is an `xstream` composition operator that takes an HTMLCanvas stream
+ * as input and returns a stream of the dimensions of its parent on output.
+ */
+function parentSize(canvas$) {
+  return canvas$.map(canvas => {
+    if (!canvas || !canvas.parentNode) return xs.empty();
+    return xs.merge(xs.of(undefined), fromEvent(window, 'resize')).map(() => [
+      canvas.parentNode.offsetWidth,
+      canvas.parentNode.offsetHeight
+    ]).compose(dropRepeats((a, b) => (a[0] == b[0] && a[1] == b[1])));
+  }).flatten();
+}
+export { parentSize };
 
 /**
  * relativeMousePosition: 
@@ -86,25 +106,3 @@ function getOver(event, tree) {
 }
 
 export { getOver };
-
-/**
- * Reducer Utilities
- *
- * These help manage reducers to be passed up the state tree
- */
-function keyReducer(key) {
-  return reducer$ => reducer$.map(reducer => ({ key, reducer }));
-}
-
-function liftReducers(reducer$$) {
-  return reducer$$.compose(flattenConcurrently).map(({ key, reducer }) => (
-    tree => {
-      const treeCopy = { ...tree };
-      const index = treeCopy.children.findIndex(c => c.key === key);
-      if (index >= 0) {
-        treeCopy.children[index] = reducer(treeCopy.children[index]);
-      }
-      return treeCopy;
-    }
-  ));
-}

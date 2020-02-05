@@ -18,7 +18,7 @@ For instance, I may choose that the state is as follows at the initial time,
 ```js
 {
   type: 'root',
-  id: 'canvas',
+  canvas: someHTMLCanvasObject
   width: 800,
   height: 200,
   children: [
@@ -96,8 +96,7 @@ function renderFunc(canvas, state) {
 
 Note that this app imported `xs` from [xstream](https://github.com/staltz/xstream) and `frames` from [frames.js](https://github.com/mvarble/frames.js).
 Of course, the app can get as complicated as you want it to be.
-The purpose of this project is to simply deal with the imperative rendering / resizing of the canvas, and sending appropriate data to the app.
-It also includes components and utilities for making work like the example above more streamlined.
+The purpose of this project is to simply deal with the imperative rendering / resizing of the canvas and providing components and utilities for parsing clicks.
 
 ## API
 
@@ -106,27 +105,23 @@ It also includes components and utilities for making work like the example above
 This is the function which generates drivers to perform the desired renders on state changes.
 
 ```js
-driver = makeViewportDriver(renderFunc [, vdomSelector])
+driver = makeViewportDriver(renderFunc)
 ```
 
 The returned `driver` is a [Cycle.js](https://cycle.js.org/) driver which will perform the imperative renders as declared by `renderFunc`.
 One provides the function `renderFunc` such that `renderFunc(canvas, state)` renders `state` on the DOM element `canvas`.
-The driver is simply responsible for searching the dom for the canvas and running this function accordingly.
-
-The driver also returns sources for the mounted app; the source will be an object with the following keys.
-
-| tag | signature |
-|---|---|
-| mounted | Stream<id> | 
-| resize | Stream<{ id, dims }> | 
-
-The `mounted` stream will fire a value `id` corresponding to a value `state.id` that was provided to the driver and has been successfully found in the DOM by the driver.
-The driver will repeatedly look for the appropriate DOM element for mounting purposes, so one may optimize searches by providing the optional argument `vdomSelector` to allow the driver to only observe a subset of the DOM tree for mutations.
-
-The `resize` stream will fire for each DOM element that has been successfully mounted.
-It will fire the [width, height] dimensions `[dims[0], dims[1]]` for the DOM element with id attribute `id` each time said element resizes.
+The driver is simply responsible for performing this render and resizing the provided canvas.
 
 ### Utilities
+
+#### parentSize
+
+This is an [xstream](https://github.com/staltz/xstream) composition operator that takes an HTMLCanvas stream as input and returns a stream of the dimensions of its parent on output.
+It basically flattens a derivative of `fromEvent(window, 'resize')` which sends only if the parent size changes.
+
+```js
+parentSize$ = canvas$.compose(parentSize);
+```
 
 #### relativeMousePosition
 
@@ -137,7 +132,7 @@ pos = relativeMousePosition(event)
 ```
 
 It uses `event.clientX` and `event.clientY` to understand how the mouse was placed, relative to `event.target`.
-If one performs `relativeMousePosition(event)` for any event returned from a stream in the [MouseObject](#mouse-object) `drag` stream, it will instead get the position relative to `event.dragStart`, which is the `event.target` at the mousedown event that started the interior `drag` stream.
+If one performs `relativeMousePosition(event)` for any event returned from a stream in the [MouseObject](#mouseobject) `drag` stream, it will instead get the position relative to `event.dragStart`, which is the `event.target` at the mousedown event that started the interior `drag` stream.
 
 #### isOver
 
@@ -164,8 +159,8 @@ This is a that searches down the depth of a tree if any node in the state is und
 nodeOrNull = getOver(event, tree)
 ```
 
-When provided a mouse event `event` and [unist](https://github.com/syntax-tree/unist) tree `tree`, this function will search through `tree` using [unist-util-visit](https://github.com/syntax-tree/unist-util-visit) to see if any nodes were covered by the mouse, as according to the [isOver](#is-over) logic.
-If a node was successful, the visiting utility cancels and proceeds to rerun on the successful node, until it finds the deepest descendent on which [isOver](#is-over) was true.
+When provided a mouse event `event` and [unist](https://github.com/syntax-tree/unist) tree `tree`, this function will search through `tree` using [unist-util-visit](https://github.com/syntax-tree/unist-util-visit) to see if any nodes were covered by the mouse, as according to the [isOver](#isover) logic.
+If a node was successful, the visiting utility cancels and proceeds to rerun on the successful node, until it finds the deepest descendent on which [isOver](#isover) was true.
 The function will return this deepest descendent or `null` if no node of `tree` was under the mouse.
 
 ### Components
@@ -208,9 +203,9 @@ This component is responsible for filtering mouse streams to those that correspo
 filteredMouse = FilteredMouse(mouse, node)
 ```
 
-By inputting a [MouseObject](#mouse-object) `mouse` and a [frame](https://github.com/mvarble/frames.js) `node`, one will get a `filteredMouse`, which can be seen as the original `mouse`, along with a new `filteredMouse.select` method.
-By running `childMouse = filteredMouse.select(key)`, one will receive a new [MouseObject](#mouse-object) `childMouse` corresponding to the streams of `mouse`, filtered to those in which the position of the mouse was over the child in `node.children` with `child.key` matching the provided `key`.
-The filtering logic is performed by the [isOver](#is-over) function.
+By inputting a [MouseObject](#mouseobject) `mouse` and a [frame](https://github.com/mvarble/frames.js) `node`, one will get a `filteredMouse`, which can be seen as the original `mouse`, along with a new `filteredMouse.select` method.
+By running `childMouse = filteredMouse.select(key)`, one will receive a new [MouseObject](#mouseobject) `childMouse` corresponding to the streams of `mouse`, filtered to those in which the position of the mouse was over the child in `node.children` with `child.key` matching the provided `key`.
+The filtering logic is performed by the [isOver](#isover) function.
 
 #### KilledMouse
 
@@ -220,5 +215,5 @@ This component is responsible for putting a lifecycle on mouse streams.
 killedMouse = KilledMouse(mouse, end)
 ```
 
-By inputting a [MouseObject](#mouse-object) `mouse` and stream `end`, the user will get `killedMouse`, another [MouseObject](#mouse-object), such that `killedMouse.stream = mouse.stream.endWhen(end)` for each `stream` tag in the [MouseObject](#mouse-object).
-If `mouse` was a [FilteredMouse](#filtered-mouse), the `killedMouse.select` method will also only return streams which end when `end` fires.
+By inputting a [MouseObject](#mouseobject) `mouse` and stream `end`, the user will get `killedMouse`, another [MouseObject](#mouseobject), such that `killedMouse.stream = mouse.stream.endWhen(end)` for each `stream` tag in the [MouseObject](#mouseobject).
+If `mouse` was a [FilteredMouse](#filteredmouse), the `killedMouse.select` method will also only return streams which end when `end` fires.

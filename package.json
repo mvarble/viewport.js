@@ -1,6 +1,6 @@
 {
   "name": "@mvarble/viewport.js",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -25,6 +25,8 @@
   "devDependencies": {
     "@babel/core": "^7.7.7",
     "@babel/preset-env": "^7.7.7",
+    "@cycle/dom": "^22.4.0",
+    "@cycle/isolate": "^5.2.0",
     "@cycle/run": "^5.4.0",
     "babel-loader": "^8.0.6",
     "canvas": "^2.6.1",
