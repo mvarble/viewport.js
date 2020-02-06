@@ -9,8 +9,37 @@ import * as math from 'mathjs';
 import xs from 'xstream';
 import fromEvent from 'xstream/extra/fromEvent';
 import dropRepeats from 'xstream/extra/dropRepeats';
+import sampleCombine from 'xstream/extra/sampleCombine';
 import visit from 'unist-util-visit';
 import { locFrameTrans } from '@mvarble/frames.js';
+
+/**
+ * refreshReducer
+ *
+ * This is a function which produces a reducer stream corresponding to adding
+ * a canvas to the app state. This is to be done when the app changes the DOM 
+ * outside of the component's knowledge, and thus leaves the HTMLElement in the
+ * app state stale.
+ */
+function refreshReducer(state$, canvas$) {
+  return canvas$.compose(sampleCombine(state$))
+    .filter(([_, { canvas }]) => !canvas || !document.body.contains(canvas))
+    .map(([canvas]) => (tree => ({ ...tree, canvas })))
+}
+export { refreshReducer };
+
+/**
+ * mountCanvas
+ * 
+ * This is an `xtream` composition operator that takes a reducer stream and
+ * returns a different reducer stream with the added manipulation that the 
+ * most current canvas is mounted.
+ */
+function mountCanvas(canvas$) {
+  return reducer$ => reducer$.compose(sampleCombine(canvas$))
+    .map(([reducer, canvas]) => (tree => ({ ...reducer(tree), canvas })));
+}
+export { mountCanvas };
 
 /**
  * parentSize
@@ -25,7 +54,7 @@ function parentSize(canvas$) {
       canvas.parentNode.offsetWidth,
       canvas.parentNode.offsetHeight
     ]).compose(dropRepeats((a, b) => (a[0] == b[0] && a[1] == b[1])));
-  }).flatten();
+  });
 }
 export { parentSize };
 

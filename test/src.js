@@ -37,7 +37,7 @@ function OuterComponent(sources) {
 function InnerComponent(sources) {
   const dom$ = xs.of(h('canvas'));
   const canvas$ = sources.DOM.select('canvas').element().take(1);
-  const resize$ = canvas$.compose(parentSize);
+  const resize$ = canvas$.compose(parentSize).flatten();
   const state$ = xs.combine(resize$, canvas$).map(([dims, canvas]) => ({
     canvas,
     width: dims[0],

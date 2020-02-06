@@ -18,7 +18,7 @@ For instance, I may choose that the state is as follows at the initial time,
 ```js
 {
   type: 'root',
-  canvas: someHTMLCanvasObject
+  canvas: someHTMLCanvasObject,
   width: 800,
   height: 200,
   children: [
@@ -114,13 +114,30 @@ The driver is simply responsible for performing this render and resizing the pro
 
 ### Utilities
 
-#### parentSize
+#### refreshReducer
 
-This is an [xstream](https://github.com/staltz/xstream) composition operator that takes an HTMLCanvas stream as input and returns a stream of the dimensions of its parent on output.
-It basically flattens a derivative of `fromEvent(window, 'resize')` which sends only if the parent size changes.
+This is a function which produces a reducer stream corresponding to adding a canvas to the app state.
+This is to be done when the app changes the DOM outside the component's knowledge, and thus leaves the HTMLElement in the app state stale.
 
 ```js
-parentSize$ = canvas$.compose(parentSize);
+refreshReducer$ = refreshReducer(state$, canvas$);
+```
+
+#### mountCanvas
+
+This is an [xstream](https://github.com/staltz/xstream) composition operator that takes a reducer stream and returns a different reducer stream with the added manipulation that the most current canvas is mounted.
+
+```js
+newReducer$ = oldReducer$.compose(mountCanvas(canvas$));
+```
+
+#### parentSize
+
+This is an [xstream](https://github.com/staltz/xstream) composition operator that takes an HTMLCanvas stream as input and returns a stream of streams of the dimensions of its parent on output.
+It returns a new stream for each fire of the input stream; each of the fired streams uses `fromEvent(window, 'resize')` to fire whenever the parent's dimensions change.
+
+```js
+parentSize$$ = canvas$.compose(parentSize);
 ```
 
 #### relativeMousePosition

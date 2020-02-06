@@ -1,12 +1,14 @@
 import { MouseObject, FilteredMouse, KilledMouse } from './components';
 import { makeViewportDriver } from './driver';
-import { parentSize, relativeMousePosition, isOver, getOver } from './utils';
+import { refreshReducer, mountCanvas, parentSize, relativeMousePosition, isOver, getOver } from './utils';
 
 export {
   MouseObject,
   FilteredMouse,
   KilledMouse,
   makeViewportDriver,
+  refreshReducer,
+  mountCanvas,
   parentSize,
   relativeMousePosition,
   isOver,
@@ -18,6 +20,8 @@ export default {
   FilteredMouse,
   KilledMouse,
   makeViewportDriver,
+  refreshReducer,
+  mountCanvas,
   parentSize,
   relativeMousePosition,
   isOver,
