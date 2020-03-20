@@ -1,37 +1,39 @@
 {
   "name": "@mvarble/viewport.js",
-  "version": "0.1.2",
-  "description": "",
+  "version": "1.1.0",
+  "description": "Canvas rendering in Cycle.js",
   "main": "index.js",
+  "dependencies": {
+    "@cycle/dom": "^22.4.0",
+    "xstream": "^11.11.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.8.7",
+    "@babel/preset-env": "^7.8.7",
+    "@cycle/run": "^5.4.0",
+    "@cycle/state": "^1.4.0",
+    "babel-loader": "^8.0.6",
+    "browserify": "^16.5.0",
+    "webpack": "^4.42.0",
+    "webpack-node-externals": "^1.7.2"
+  },
   "scripts": {
-    "build": "node build"
+    "build": "node build",
+    "example": "node example/build.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mvarble/viewport.js.git"
   },
+  "keywords": [
+    "canvas",
+    "cycle.js",
+    "snabbdom"
+  ],
   "author": "Matthew Varble",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/mvarble/viewport.js/issues"
   },
-  "homepage": "https://github.com/mvarble/viewport.js#readme",
-  "dependencies": {
-    "@mvarble/frames.js": "^1.0.1",
-    "mathjs": "^6.2.3",
-    "unist-util-visit": "^2.0.0",
-    "xstream": "^11.11.0"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.7.7",
-    "@babel/preset-env": "^7.7.7",
-    "@cycle/dom": "^22.4.0",
-    "@cycle/isolate": "^5.2.0",
-    "@cycle/run": "^5.4.0",
-    "babel-loader": "^8.0.6",
-    "canvas": "^2.6.1",
-    "gifencoder": "^2.0.1",
-    "webpack": "^4.41.5",
-    "webpack-node-externals": "^1.7.2"
-  }
+  "homepage": "https://github.com/mvarble/viewport.js#readme"
 }

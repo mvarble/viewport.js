@@ -1,4 +1,4 @@
-src
 build.js
-example.js
+example
+src.js
 .babelrc
