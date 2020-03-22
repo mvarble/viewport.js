@@ -8,13 +8,11 @@ It does so by assuming that the canvas render is dependent on a [frames.js](http
 
 # Viewport
 
-This is a component of signature
-
 ```js
-({ render, renderState, vdom }) => newVdom
+const newVdom$ = Viewport({ render, renderState, vdom });
 ```
 
-where `render` is a stream of functions of signature `(HTMLCanvas, object) => void` which correspond to the imperative rendering of the canvas, `renderState` is the state which will be provided into the render function's second argument, and `vdom` is a stream of Snabbdom canvas elements that this component uses to create the new output stream `newVdom`.
+This is a component where `render` is a stream of functions of signature `(HTMLCanvas, object) => void` which correspond to the imperative rendering of the canvas, `renderState` is the state which will be provided into the render function's second argument, and `vdom` is a stream of Snabbdom canvas elements that this component uses to create the new output stream `newVdom$`.
 
 In essence, one can think of this component as using `renderState` to thunk a hook `vnode => render(vnode.elm, renderState)` and bind it to `newVdom`.
 This is effectively what is done in practice, except it creates a new vdom with matching selector, data, and children for patching purposes.
@@ -82,7 +80,7 @@ The function returns true if and only if the mouse pointer is in at least one ob
 ## getOver
 
 ```js
-bool = getOver(event, frame, deep)
+overFrame = getOver(event, frame, deep)
 ```
 
 This function will traverse through the inclusive descendants of `frame` and return one which satisfies the [isOver](#isover) condition.
@@ -102,7 +100,7 @@ In a Cycle.js app, one uses the [ViewportParser](#viewport-parser) component to 
 
 ## ViewportParser
 
-```
+```js
 frameSource = ViewportParser({ domSource, frame, isDeep })
 ```
 
