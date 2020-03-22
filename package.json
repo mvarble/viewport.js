@@ -5,6 +5,8 @@
   "main": "index.js",
   "dependencies": {
     "@cycle/dom": "^22.4.0",
+    "@mvarble/frames.js": "^1.0.4",
+    "unist-util-visit": "^2.0.2",
     "xstream": "^11.11.0"
   },
   "devDependencies": {

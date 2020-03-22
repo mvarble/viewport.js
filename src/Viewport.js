@@ -1,12 +1,21 @@
 /**
- * viewport.js
+ * Viewport.js
  *
- * This module exports a Cycle.js component named `Viewport` that is responsible 
- * for declarative rendering on the canvas. It simply takes the sufficient data 
- * for the render, and returns a Snabbdom element with the appropriate hooks 
- * bound.
- *
- * The `Viewport` component is of signature:
+ * This module export the Cycle.js component which allows for declarative 
+ * rendering on the canvas.
+ */
+
+// module dependencies: npm packages
+import xs from 'xstream';
+import { h } from '@cycle/dom';
+
+// exports
+export { Viewport };
+
+/* Viewport:
+ * 
+ * This function takes the sufficient data for the render, and returns a 
+ * Snabbdom element with the appropriate render hooks bound. It has signature:
  *
  *   ({ render, renderState, vdom }) => vdom
  *
@@ -22,12 +31,6 @@
  * The render function hooks to the `insert` and `postpatch` hooks; if the 
  * provided snabbdom element has these hooks, it calls the render _after_ them.
  */
-
-// module dependencies: npm packages
-import xs from 'xstream';
-import { h } from '@cycle/dom';
-
-// Viewport
 function Viewport({ render, renderState, vdom }) {
   return xs.combine(render, renderState, vdom)
     .filter(([render]) => typeof render === 'function')
@@ -57,7 +60,7 @@ function Viewport({ render, renderState, vdom }) {
       } else { vdom.data.hook.postpatch = (old, vnode) => renderHook(vnode); }
 
       // return the snabbdom vnode
-      return h(vdom.sel, vdom.data);
+      return h(vdom.sel, vdom.data, vdom.children || []);
     });
 }
 
@@ -73,5 +76,3 @@ function isRenderable(vnode) {
   }
   return renderable;
 }
-
-export default Viewport;
