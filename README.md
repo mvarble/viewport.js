@@ -9,7 +9,7 @@ It does so by assuming that the canvas render is dependent on a [frames.js](http
 # Viewport
 
 ```js
-const newVdom$ = Viewport({ render, renderState, vdom });
+newVdom$ = Viewport({ render, renderState, vdom });
 ```
 
 This is a component where `render` is a stream of functions of signature `(HTMLCanvas, object) => void` which correspond to the imperative rendering of the canvas, `renderState` is the state which will be provided into the render function's second argument, and `vdom` is a stream of Snabbdom canvas elements that this component uses to create the new output stream `newVdom$`.
