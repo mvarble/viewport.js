@@ -14,8 +14,8 @@ import { locFrameTrans, identityFrame } from '@mvarble/frames.js';
 
 // our exports
 export {
+  FrameSourceMaster,
   FrameSource,
-  ViewportParser,
   relativeMousePosition,
   isOver,
   getOver,
@@ -45,59 +45,57 @@ export {
  * `frameSource.select(selectorA).select(selectorB)` will simply insist on all
  * of them matching.
  */
-class FrameSource {
-  constructor(domSource, frame$, isDeep, selector) {
-    this.domSource = domSource;
-    this.frame$ = frame$;
-    this.selector = selector || (() => true);
-    this.isDeep = isDeep;
+class FrameSourceMaster {
+  constructor(domSource, frame$, isDeep$) {
+    this._domSource = domSource;
+    this._frame$ = frame$;
+    this._isDeep$ = isDeep$;
+    this._parsedStreams = {};
   }
 
   select(selector) {
     if (selector && typeof selector !== 'function') {
-      throw new Error('FrameSource: `select` needs a function node => bool');
+      throw new TypeError('`FrameSource.select` needs a function obj => bool');
       return;
     }
-    return new FrameSource(
-      this.domSource,
-      this.frame$, 
-      node => this.selector(node) && selector(node),
-      this.isDeep,
-    );
+    return new FrameSource(this, selector)
   }
 
   events(type) {
-    return this.domSource.events(type)
-      .compose(sampleCombine(this.frame$, this.isDeep))
-      .map(([event, frame, isDeep]) => {
-        const over = getOver(event, frame, isDeep);
-        if (this.selector(over)) {
+    if (!this._parsedStreams[type]) {
+      this._parsedStreams[type] = this._domSource.events(type)
+        .compose(sampleCombine(this._frame$, this._isDeep$))
+        .map(([event, frame, isDeep]) => {
+          const over = getOver(event, frame, isDeep);
           event.frame = over;
           return event;
-        } else {
-          return undefined
-        }
-      })
-      .filter(event => event);
+        });
+    }
+    return this._parsedStreams[type];
   }
 }
 
-/**
- * ViewportParser:
- *
- * This is Cycle.js component which allows us to contextualize the events of a 
- * canvas DOM element in terms of the frame.js state it most recently 
- * represented in the render (assuming the provided streams coincide). Its 
- * signature is of the form:
- *
- * { domSource, frame } => frameSource
- *
- * where `domSource` is a `DOMSource` object corresponding to the canvas DOM
- * object, `frame` is a stream of `frame.js` frames, and `frameSource` is a 
- * `FrameSource`.
- */
-function ViewportParser({ domSource, frame, isDeep }) {
-  return new FrameSource(domSource, frame, isDeep);
+class FrameSource {
+  constructor(master, selector) {
+    this._master = master;
+    this._selector = selector;
+  }
+
+  select(selector) {
+    if (selector && typeof selector !== 'function') {
+      throw new TypeError('`FrameSource.select` needs a function obj => bool');
+      return;
+    }
+    return new FrameSource(
+      this._master,
+      frame => this._selector(frame) && selector(frame)
+    )
+  }
+
+  events(type) {
+    return this._master.events(type)
+      .filter(e => e.frame && this._selector(e.frame));
+  }
 }
 
 /**

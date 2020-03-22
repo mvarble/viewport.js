@@ -107,12 +107,13 @@ const app = ({ DOM, state }) => {
   // build a FrameSource with the ViewportParser
   const frameSource = ViewportParser({
     domSource: DOM.select('canvas'), 
-    frame: state.stream
+    frame: state.stream,
+    isDeep: xs.of(true),
   });
 
   // parse clicks between yellow and blue
   const isCircle = frame => frame && frame.type === 'circle';
-  const mousedown$ = frameSource.select(isCircle).events('mousedown').debug();
+  const mousedown$ = frameSource.select(isCircle).events('mousedown');
   const intent$ = createDrag(mousedown$).flatten()
     .filter(event => event && event.isDrag && event.isDrag.frame)
     .map(event => ({ event, click: event.isDrag.frame.key }))

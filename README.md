@@ -88,16 +88,6 @@ If no such descendant exists, it returns `null`.
 If `deep` is false, the function will return the (breadth-) inclusive descendant that satisfies the condition.
 If `deep` is true, the function will follow down the branch of the first condition satisfier, and proceed similarly until there it reaches the last descendant which satisfies the condition.
 
-## FrameSource
-
-```js
-frameSource = new FrameSource(domSource, frame$, isDeep, selector)
-```
-
-This class exists as a version of `DOMSource` that allows us to contextualize the events of a canvas DOM element in terms of a frame.js state.
-By calling the method `FrameSource.events`, the user will get a stream of events fired by the canvas DOM element with attached frame metadata; the stream is filtered to only correspond to events on which the output of the [getOver](#getover) function match a provided `FrameSource.selector` function.
-In a Cycle.js app, one uses the [ViewportParser](#viewport-parser) component to instantiate these.
-
 ## ViewportParser
 
 ```js
@@ -105,7 +95,9 @@ frameSource = ViewportParser({ domSource, frame, isDeep })
 ```
 
 This is a Cycle.js component that allows us to parse the click intent of an interactive canvas that has rendered a frame.
-By providing a `DOMSource` instance `domSource`, frame stream `frame`, and boolean stream `isDeep`, this component will return a [FrameSource](#frame-source) object allowing us to get the events.
+By providing a `DOMSource` instance `domSource`, frame stream `frame`, and boolean stream `isDeep`, this component will return an object with methods `select` and `events`.
+By calling `frameSource.select(frameTest).events('click')` for some function `frameTest` of signature `frame => bool`, this will return the stream of clicks `domSource.events('click')`, filtered to only include those which `frameTest(getOver(event, frame, isDeep))` is true (here, the arguments of `getOver` were the objects of the streams).
+Moreover, because the parsed frame returned by `getOver` is usually of interest, a reference of this object is appended to the `event.frame`.
 
 # Example
 

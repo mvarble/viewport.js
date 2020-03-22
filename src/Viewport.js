@@ -1,7 +1,7 @@
 /**
  * Viewport.js
  *
- * This module export the Cycle.js component which allows for declarative 
+ * This module export the Cycle.js components which allow for declarative 
  * rendering on the canvas.
  */
 
@@ -9,8 +9,11 @@
 import xs from 'xstream';
 import { h } from '@cycle/dom';
 
+// module dependencies: project modules
+import { FrameSourceMaster } from './clicks';
+
 // exports
-export { Viewport };
+export { Viewport, ViewportParser };
 
 /* Viewport:
  * 
@@ -75,4 +78,23 @@ function isRenderable(vnode) {
     if (e.name !== 'ReferenceError') throw e;
   }
   return renderable;
+}
+
+/**
+ * ViewportParser:
+ *
+ * This is Cycle.js component which allows us to contextualize the events of a 
+ * canvas DOM element in terms of the frame.js state it most recently 
+ * represented in the render (assuming the provided streams coincide). Its 
+ * signature is of the form:
+ *
+ * { domSource, frame, isDeep } => frameSource
+ *
+ * where `domSource` is a `DOMSource` object corresponding to the canvas DOM
+ * object, `frame` is a stream of `frame.js` frames, `isDeep` is a stream of
+ * booleans for the corresponding `getOver` function argument, and `frameSource` 
+ * is a `FrameSourceMaster` instance.
+ */
+function ViewportParser({ domSource, frame, isDeep }) {
+  return new FrameSourceMaster(domSource, frame, isDeep);
 }
