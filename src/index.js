@@ -1,7 +1,5 @@
-import { Viewport, ViewportParser } from './Viewport';
+import { Viewport, makeViewportDriver } from './Viewport';
 import {
-  FrameSourceMaster,
-  FrameSource,
   relativeMousePosition,
   isOver,
   getOver,
@@ -10,9 +8,7 @@ import {
 
 export {
   Viewport,
-  ViewportParser,
-  FrameSourceMaster,
-  FrameSource,
+  makeViewportDriver,
   relativeMousePosition,
   isOver,
   getOver,
@@ -21,9 +17,7 @@ export {
 
 export default {
   Viewport,
-  ViewportParser,
-  FrameSourceMaster,
-  FrameSource,
+  makeViewportDriver,
   relativeMousePosition,
   isOver,
   getOver,

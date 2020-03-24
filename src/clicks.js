@@ -7,96 +7,12 @@
 
 // module dependencies: npm packages
 import xs from 'xstream';
-import sampleCombine from 'xstream/extra/sampleCombine';
 import fromEvent from 'xstream/extra/fromEvent';
 import visit from 'unist-util-visit';
 import { locFrameTrans, identityFrame } from '@mvarble/frames.js';
 
 // our exports
-export {
-  FrameSourceMaster,
-  FrameSource,
-  relativeMousePosition,
-  isOver,
-  getOver,
-  createDrag,
-};
-
-/**
- * FrameSource:
- *
- * This class is supposed to serve as our version of the `DOMSource` class that
- * the Cycle.js factory `DOMDriver` outputs. In fact, it is simply a wrapper 
- * of a `DOMSource` of sorts.
- *
- * Explicitly, each `FrameSource` is in the context of some `DOMSource` and a 
- * stream of `frame.js` frame trees. It works so that repeatedly calling the 
- * `select` method until finally calling the `events` method will:
- *
- *   (1) get a stream of events from `DOMSource.events` method,
- *   (2) `sampleCombine` this stream with `FrameSource.frame$` and use the
- *       `getOver` function to see on which frame the events were clicked.
- *   (3) use the selectors given to `FrameSource.select` to parse if the 
- *       returned `getOver` node matches.
- *   (4) filter the stream of matched events.
- *
- * The selectors provided to the `select` method should be functions of 
- * signature (node => bool). Calling multiple in conjunction via 
- * `frameSource.select(selectorA).select(selectorB)` will simply insist on all
- * of them matching.
- */
-class FrameSourceMaster {
-  constructor(domSource, frame$, isDeep$) {
-    this._domSource = domSource;
-    this._frame$ = frame$;
-    this._isDeep$ = isDeep$;
-    this._parsedStreams = {};
-  }
-
-  select(selector) {
-    if (selector && typeof selector !== 'function') {
-      throw new TypeError('`FrameSource.select` needs a function obj => bool');
-      return;
-    }
-    return new FrameSource(this, selector)
-  }
-
-  events(type) {
-    if (!this._parsedStreams[type]) {
-      this._parsedStreams[type] = this._domSource.events(type)
-        .compose(sampleCombine(this._frame$, this._isDeep$))
-        .map(([event, frame, isDeep]) => {
-          const over = getOver(event, frame, isDeep);
-          event.frame = over;
-          return event;
-        });
-    }
-    return this._parsedStreams[type];
-  }
-}
-
-class FrameSource {
-  constructor(master, selector) {
-    this._master = master;
-    this._selector = selector;
-  }
-
-  select(selector) {
-    if (selector && typeof selector !== 'function') {
-      throw new TypeError('`FrameSource.select` needs a function obj => bool');
-      return;
-    }
-    return new FrameSource(
-      this._master,
-      frame => this._selector(frame) && selector(frame)
-    )
-  }
-
-  events(type) {
-    return this._master.events(type)
-      .filter(e => e.frame && this._selector(e.frame));
-  }
-}
+export { relativeMousePosition, isOver, getOver, createDrag };
 
 /**
  * relativeMousePosition:
@@ -219,12 +135,7 @@ const appendDrag = (e, e1) => {
 
 function createDrag(startStream$) {
   // if there is no document, we return an empty stream
-  try {
-    document;
-  } catch (e) {
-    if (e.name !== 'ReferenceError') throw e;
-    return xs.empty();
-  }
+  if (typeof document === 'undefined') return xs.empty();
 
   // create the output stream
   return startStream$.map(e => {
