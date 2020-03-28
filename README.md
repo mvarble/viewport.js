@@ -1,6 +1,6 @@
 # viewport.js
 
-Declarative rendering on the canvas.
+Declarative Cycle.js canvas rendering.
 
 ## Introduction
 
