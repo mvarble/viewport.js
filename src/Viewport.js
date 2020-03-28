@@ -16,25 +16,88 @@ import { adapt } from '@cycle/run/lib/adapt';
 import { getOver } from './clicks';
 
 // exports
-export { Viewport, makeViewportDriver };
+export { Viewport, makeViewportDriver, parentDims };
+
+/**
+ * parentDims:
+ *
+ * This is an xstream operator that will take a stream of elements, and return
+ * a stream of [offsetWidth, offsetHeight] parent resizes.
+ */
+function parentDims(element$) {
+  const resizes$ = xs.merge(xs.of(undefined), fromEvent(window, 'resize'));
+  return xs.combine(element$, resizes$)
+    .filter(([el]) => el && el.parentNode)
+    .map(([el]) => [el.parentNode.offsetWidth, el.parentNode.offsetHeight])
+    .compose(dropRepeats(([a, b], [c, d]) => a === c && b === d));
+}
+
 
 // these are boolean functions that help us determine the state of a snabbdom
-// vnode
-function isRenderable(vnode) {
+// vdom
+function isRenderable(vdom) {
   if (typeof document === 'undefined') return false;
   return (
-    vnode
-    && vnode.elm 
-    && document.body.contains(vnode.elm)
+    vdom
+    && vdom.elm 
+    && document.body.contains(vdom.elm)
   );
 }
 
-function alreadyHasHook(vnode) {
+function alreadyHasHook(vdom) {
   return (
-    vnode.data
-    && vnode.data.hook
-    && vnode.data.hook.insert
+    vdom.data
+    && vdom.data.hook
+    && vdom.data.hook.insert
   );
+}
+
+function withRenderHook(vdom, renderFunc, stateObject) {
+  if (alreadyHasHook(vdom)) {
+    if (!vdom.data.viewport) {
+      const insert = vnode => {
+        vdom.data.hook.insert(vnode);
+        renderFunc(vnode.elm, stateObject);
+      };
+      const newVdom = {
+        ...vdom,
+        data: {
+          ...vdom.data,
+          hook: {
+            ...vdom.data.hook,
+            insert,
+          },
+          viewport: { oldInsert: vdom.data.hook.insert }
+        },
+      };
+      return newVdom;
+    } else {
+      const insert = vnode => {
+        if (vnode.data.viewport.oldInsert) {
+          vnode.data.viewport.oldInsert(vnode);
+        }
+        renderFunc(vnode.elm, stateObject);
+      };
+      const newVdom = {
+        ...vdom,
+        data: {
+          ...vdom.data,
+          hook: {
+            ...vdom.data.hook,
+            insert,
+          },
+        },
+      };
+      return newVdom;
+    }
+  } else {
+    const newVdom = { ...vdom };
+    if (!newVdom.data) { newVdom.data = {}; }
+    if (!newVdom.data.hook) { newVdom.data.hook = {}; }
+    newVdom.data.viewport = { oldInsert: undefined };
+    vdom.data.hook.insert = vnode => renderFunc(vnode.elm, stateObject);
+    return newVdom;
+  }
 }
 
 /**
@@ -43,39 +106,43 @@ function alreadyHasHook(vnode) {
  * This is a simple component that appends a hook to the relevant snabbdom and
  * prepares a stream for the ViewportDriver.
  */
-function Viewport({ state, canvas, render }) {
-  const viewport$ = xs.combine(state, canvas, render)
+function Viewport({ DOM, state, canvas, render }) {
+  const all$$ = xs.combine(state, canvas, render)
     .map(([stateObject, vdom, renderFunc]) => {
       // if there is no vdom, we cannot do anything
-      if (!vdom) return undefined;
+      if (!vdom) return xs.empty();
 
       // if there is a ready vdom, we simply pile everything together
-      if (isRenderable(vdom)) { return [stateObject, vdom, renderFunc]; }
-
-      // if the vdom is not ready, we need to add render hooks on every update
-      if (alreadyHasHook(vdom)) {
-        if (!vdom.data.viewport) {
-          const thunk = vdom.data.hook.insert;
-          vdom.data.viewport = vnode => render(vnode.elm, state);
-          vdom.data.hook.insert = function (vnode) {
-            thunk(vnode);
-            vnode.data.viewport(vnode);
-          };
-        } else {
-          vdom.data.viewport = vnode => render(vnode.elm, state);
-        }
-      } else {
-        if (!vdom.data) { vdom.data = {}; }
-        if (!vdom.data.hook) { vdom.data.hook = {}; }
-        vdom.data.viewport = vnode => render(vnode.elm, state);
+      if (isRenderable(vdom)) { 
+        return {
+          vdom: xs.of(vdom),
+          viewport: xs.of({
+            render: renderFunc,
+            state: stateObject,
+            elm: vdom.elm,
+          }),
+        };
       }
-      return [stateObject, vdom, renderFunc];
-    }).filter(obj => obj);
 
-  // we return the (possibly adapted) DOM and viewport streams
+      // if the vdom is not ready, we need to add insert render hooks 
+      const newVdom = withRenderHook(vdom, renderFunc, stateObject);
+      
+      // in the chance that the vdom has been patched and the object is already
+      // in there. In such a case, take the most recent result of the element
+      return {
+        vdom: xs.of(newVdom),
+        viewport: DOM.select(newVdom.sel).element().take(1).map(elm => ({
+          render: renderFunc,
+          state: stateObject,
+          elm,
+        })),
+      };
+    })
+
+  // we return the adapted DOM and viewport streams
   return { 
-    DOM: viewport$.map(v => v[1]),
-    viewport: viewport$,
+    DOM: all$$.map(obj => obj.vdom).flatten(),
+    viewport: all$$.map(obj => obj.viewport).flatten(),
   };
 }
 
@@ -93,10 +160,9 @@ function makeViewportDriver(isDeep) {
 
   function driver(viewport$) {
     // create the render callback 
-    const next = ([state, vnode, render]) => {
-      if (isRenderable(vnode)) {
-        render(vnode.elm, state);
-        return;
+    const next = ({ render, elm, state }) => {
+      if (typeof document !== 'undefined' && document.body.contains(elm)) {
+        render(elm, state);
       }
     };
 
@@ -104,7 +170,10 @@ function makeViewportDriver(isDeep) {
     viewport$.addListener({ next });
 
     // return the FrameSource
-    return new UnmountedFrameSource(viewport$.map(v => v[0]), isDeep);
+    return new UnmountedFrameSource(
+      viewport$.map(obj => ({ ...obj.state, scope: obj.scope })),
+      isDeep,
+    );
   }
 
   return driver;
@@ -115,21 +184,46 @@ function makeViewportDriver(isDeep) {
  *
  * An instance of this class is returned by the ViewportDriver.
  */
+const scopeSplit = '___';
+const prependScope = (oldScope, scope) => (
+  scope 
+  ? ((!oldScope || oldScope === '') ? scope : scope + scopeSplit + oldScope)
+  : oldScope
+);
+const appendScope = (oldScope, scope) => (
+  scope 
+  ? ((!oldScope || oldScope === '') ? scope : oldScope + scopeSplit + scope)
+  : oldScope
+);
+const isolateSink = (sink, scope) => sink.map(viewport => ({
+  ...viewport,
+  scope: prependScope(viewport.scope, scope),
+}));
 class UnmountedFrameSource {
-  constructor(state$, isDeep) {
+  constructor(state$, isDeep, scope) {
     this._state$ = state$;
     this._isDeep = isDeep;
+    this._scope = scope || '';
+    this.isolateSource = (source, scope) => {
+      return new UnmountedFrameSource(
+        source._state$,
+        source._isDeep,
+        appendScope(source._scope, scope),
+      );
+    };
+    this.isolateSink = isolateSink;
   }
 
   mount(domSource) {
-    return new FrameSourceMaster(domSource, this._state$, this._isDeep);
+    return new FrameSourceMaster(
+      domSource,
+      this._state$,
+      this._isDeep,
+      this._scope,
+    );
   }
 
   events() {
-    throw new Error('You need to mount a `DOMSource` before requesting streams')
-  }
-
-  parentDims() {
     throw new Error('You need to mount a `DOMSource` before requesting streams')
   }
 }
@@ -143,14 +237,27 @@ class UnmountedFrameSource {
  */
 class FrameSourceMaster {
   // our constructor
-  constructor(domSource, state$, isDeep) {
+  constructor(domSource, state$, isDeep, scope) {
     this._domSource = domSource;
     this._state$ = state$;
     this._isDeep = isDeep;
     this._parsedStreams = {};
+    this._scope = scope;
+
     if (typeof window !== 'undefined') {
       this._resizes$ = xs.merge(xs.of(undefined), fromEvent(window, 'resize'));
     }
+
+    this.isolateSource = (source, scope) => {
+      return new FrameSourceMaster(
+        source._domSource,
+        source._state$,
+        source._isDeep,
+        appendScope(source._scope, scope),
+      );
+    };
+
+    this.isolateSink = isolateSink;
   }
 
   /**
@@ -159,8 +266,17 @@ class FrameSourceMaster {
    */
   events(type) {
     if (!this._parsedStreams[type]) {
+      // filter only the states within the scope
+      const state$ = this._state$.filter(state => {
+        if (this._scope === '') return true;
+        if (!state.scope || !state.scope.includes) return false;
+        return state.scope.slice(0, this._scope.length) === this._scope;
+      });
+
+      // leverage the DOMSource events
       this._parsedStreams[type] = this._domSource.events(type)
-        .compose(sampleCombine(this._state$))
+        .compose(sampleCombine(state$))
+        .filter(([event, state]) => state.scope.includes(this._scope))
         .map(([event, state]) => {
           const frame = getOver(event, state, this._isDeep);
           event.frame = frame;
@@ -181,32 +297,6 @@ class FrameSourceMaster {
     return new FrameSource(this, selector)
   }
 
-  /**
-   * this will return a stream of the parent's `offset*` dimensions on resize
-   */
-  parentDims() {
-    if (this._dimensions$) {
-      return this._dimensions$;
-    } else {
-      this._prepDimensions();
-      return this._dimensions$ ? adapt(this._dimensions$) : adapt(xs.empty());
-    }
-  }
-
-  /**
-   * simple helper function
-   */
-  _prepDimensions() {
-    if (this._dimensions$ || typeof window === 'undefined') return;
-    if (!this._resizes$) {
-      this._resizes$ = xs.merge(xs.of(undefined), fromEvent(window, 'resize'));
-    }
-
-    this._dimensions$ = xs.combine(this._domSource.element(), this._resizes$)
-      .filter(([el]) => el && el.parentNode)
-      .map(([el]) => [el.parentNode.offsetWidth, el.parentNode.offsetHeight])
-      .compose(dropRepeats(([a, b], [c, d]) => a == c && b == d));
-  }
 }
 
 /**
@@ -221,6 +311,15 @@ class FrameSource {
   constructor(master, selector) {
     this._master = master;
     this._selector = selector;
+
+    this.isolateSource = (source, scope) => {
+      return new FrameSource(
+        source._master.isolateSource(source._master, scope),
+        source._selector
+      );
+    };
+
+    this.isolateSink = isolateSink;
   }
 
   select(selector) {
@@ -237,9 +336,5 @@ class FrameSource {
   events(type) {
     return this._master.events(type)
       .filter(e => e.frame && this._selector(e.frame));
-  }
-
-  parentDims() {
-    return this._master.parentDims();
   }
 }

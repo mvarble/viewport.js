@@ -18,8 +18,16 @@ from here, all of the intent of mouse clicks and rendering are handled with a co
 const { run } = require('@cycle/run');
 const { h, makeDOMDriver } = require('@cycle/dom');
 const { withState } = require('@cycle/state');
-const { makeViewportDriver, createDrag } = require('@mvarble/viewport.js');
-const { locsFrameTrans, identityFrame } = require('@mvarble/frames.js');
+const { 
+  Viewport,
+  makeViewportDriver,
+  createDrag,
+} = require('@mvarble/viewport.js');
+const {
+  locsFrameTrans,
+  identityFrame,
+  translatedFrame,
+} = require('@mvarble/frames.js');
 
 const initial = {
   type: 'draggable-box',
@@ -91,7 +99,7 @@ Throughout, we refer to the *viewport* as the interactive canvas.
 ## Viewport
 
 ```js
-const viewportSink = Viewport({ state, canvas, render });
+viewportSink = Viewport({ state, canvas, render })
 ```
 
 This is a Cycle.js component that takes a state stream `state`, a snabbdom stream `canvas`, and a stream of imperative render functions `render`.
@@ -100,15 +108,15 @@ With these streams, it returns sink `viewportSink` with streams `viewportSink.vi
 The `viewportSink.viewport` stream exists to declare the render state for the [ViewportDriver](#viewport-driver).
 
 The `viewportSink.DOM` stream is nothing but the original stream `canvas`, but an insert hook is appended for each update of `canvas` and `render` so that the appropriate render will occur on insertion.
-This stream is to be used to build the DOM (as opposed to the `canvas` stream) so that the canvas can have the logic of a viewport.
+This stream is to be used to build the DOM (as opposed to the original `canvas` stream) so that the render will still occur if the DOM element is not created by the time the `viewportSink.viewport` stream hits the `ViewportDriver`.
 
 ### makeViewportDriver
 
 ```js
-ViewportDriver = makeViewportDriver(isDeep);
+viewportDriver = makeViewportDriver(isDeep)
 ```
 
-This function returns a [ViewportDriver](#viewport-driver) object, responsible for interfacing the canvas with the declared viewport model/view.
+This function returns a [ViewportDriver](#viewport-driver) function, responsible for interfacing the canvas with the declared viewport model/view.
 
 ### ViewportDriver
 
@@ -116,11 +124,10 @@ This function returns a [ViewportDriver](#viewport-driver) object, responsible f
 frameSource = ViewportDriver(viewport$)
 ```
 
-This is a Cycle.js driver that takes a stream of the declared render data, performs the imperative render, and returns an object capable of parsing desired viewport data.
+This is a Cycle.js driver that takes a stream of the declared render data, performs the imperative render, and returns an object of queryable streams.
 
-The input stream `viewport$` above is a stream of arrays of the form `[state, vnode, render]`, where `state` is the declared state deemed sufficient for render, `vnode` is a [Snabbdom](https://github.com/snabbdom/snabbdom) object, and `render` is a function of signature `(HTMLCanvas, state) => void` corresponding to whatever imperative stuff needs to be done for the render.
-**You need not create these streams by hand**; in fact, the `vnode` needs to have an insert hook for the first render, so you should let the [Viewport](#viewport) component handle generating these streams.
-Note that `viewport$` matches the type of `viewportSink.viewport`.
+The input stream `viewport$` above is a stream of objects with the declared state of the viewport, the appropriate imperative render function, and the DOM handle
+**You need not create these streams by hand**; you should let the [Viewport](#viewport) component handle generating these streams, with `viewport$ = viewportSink.viewport`.
 
 The output object `frameSource` is an instance of the `UnmountedFrameSource` class.
 If you would like to parse clicks on the canvas, you must start with leveraging the event queries of the `DOMDriver` by doing `frameSource.mount(DOM.select(cssSelector))`, where `cssSelector` is a tag suitable for identifying the canvas element on which you rendered, and `DOM` is a reference to the `MainDOMSource` exported by the `DOMDriver`.
@@ -128,22 +135,7 @@ The `UnmountedFrameSource.mount` method returns a (mounted) [FrameSource](#frame
 
 ## FrameSource
 
-The `FrameSource` has three methods of interest, `parentDims`, `select`, and `events`.
-
-### parentDims
-
-```js
-frameSource.parentDims()
-```
-
-This method will return a stream of the `offset*` dimensions of the element's parent node (using `MainDOMSource.element`).
-This stream will fire whenever said dimensions change, and is useful for dynamically sizing the canvas as according to its parent.
-
-> **Warning.** If you declare the canvas size dependent on this stream (and make your imperative render function resize accordingly) and the parent does not have fixed sizing, you may cause an indefinite loop of 
->
-> parent dimensions change &rarr; parentDims update &rarr; canvas dimensions change &rarr; parent change &rarr; ...
->
-> so tread lightly with setting the parent's dimensions in some fixed way (say, with CSS `vw` and `vh`).
+The `FrameSource` has two methods of interest, `select` and `events`.
 
 ### select, events
 
@@ -166,9 +158,62 @@ const boxes$ = frameSource.select(f => f && f.type === 'box').events('click');
 const disks$ = frameSource.select(f => f && f.type === 'disk').events('click');
 ```
 
-## Click Utilities
+### isolation
 
-Along with the component/driver pair that this package exports, we also have a couple of utilities that are repeatedly used in parsing clicks on the viewport.
+Each `FrameSource` instance has `isolateSource/isolateSink` static functions which can be used in isolation in your apps.
+It is intentionally set so that mounted `DOMSource` will not be isolated.
+For instance, the following app design would be such that `SomeComponent` sees the clicks of the canvas element.
+To not have this behavior, simply pass the `UnmountedFrameSource` instance and mount the isolated `DOM` in the component itself.
+
+```js
+function app({ viewport, DOM }) {
+  const frame$ = xs.of(someFrame)
+  const frameSource = viewport.mount(DOM.select('canvas'));
+  const clicks$ = isolate(SomeComponent)({ frameSource, frame: state$ });
+  return {
+    DOM: xs.of(h('canvas')),
+    log: clicks$,
+  }
+}
+
+function SomeComponent({ frameSource, frame }) {
+  // this will still trigger
+  return frameSource.select(() => true).events('click');
+}
+```
+
+Additionally, it is reasonable to design components that do not create their own canvas, but rather use the streams from a `FrameSource` to declare new state updates / render functions.
+To do this, you will likely want to remove the isolation for the `FrameSource` in the sources.
+Inside of a bigger app that uses `SomeComponent`, you would likely do something along the following lines to allow general parsed canvas clicks to pass through all the components in a frame tree.
+
+```js
+const frameSource = viewport.mount(DOM.select('canvas'));
+const IsolatedComponent = isolate(
+  SomeComponent, 
+  { frameSource: null, state: 'specific_frame' },
+)
+const componentSink = IsolatedComponent({ state, frameSource });
+```
+
+See the [example here](https://github.com/mvarble/viewport.js/blob/master/example/app3.js) to see how to interface with the [Cycle.js makeCollection API](https://cycle.js.org/api/state.html#cycle-state-source-usage-how-to-handle-a-dynamic-list-of-nested-components) to have collections of frames for building big unist trees.
+
+## Utilities
+
+Along with the component/driver pair that this package exports, we also have a couple of utilities that are repeatedly used in parsing clicks and resizes on the viewport.
+
+### parentDims
+
+```js
+parentDims$ = canvasDOM$.compose(parentDims)
+```
+
+This is an [xstream](https://github.com/staltz/xstream) operator that maps a stream `canvasDOM$` to the `[offsetWidth, offsetHeight]` resizes of its parent.
+
+> **Warning.** If you declare the canvas size dependent on this stream (and make your imperative render function resize accordingly) and the parent does not have fixed sizing, you may cause an indefinite loop of 
+>
+> parent dimensions change &rarr; parentDims update &rarr; canvas dimensions change &rarr; parent change &rarr; ...
+>
+> so tread lightly with setting the parent's dimensions in some fixed way (say, with CSS `vw` and `vh`).
 
 ### createDrag
 
