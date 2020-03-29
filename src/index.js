@@ -1,4 +1,4 @@
-import { Viewport, makeViewportDriver } from './Viewport';
+import { Viewport, ViewportDriver, parentDims } from './Viewport';
 import {
   relativeMousePosition,
   isOver,
@@ -8,7 +8,8 @@ import {
 
 export {
   Viewport,
-  makeViewportDriver,
+  ViewportDriver,
+  parentDims,
   relativeMousePosition,
   isOver,
   getOver,
@@ -17,7 +18,8 @@ export {
 
 export default {
   Viewport,
-  makeViewportDriver,
+  ViewportDriver,
+  parentDims,
   relativeMousePosition,
   isOver,
   getOver,

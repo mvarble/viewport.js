@@ -8,7 +8,7 @@
 // module dependencies: npm packages
 import xs from 'xstream';
 import fromEvent from 'xstream/extra/fromEvent';
-import visit from 'unist-util-visit';
+import visit from 'unist-util-visit-parents';
 import { locFrameTrans, identityFrame } from '@mvarble/frames.js';
 
 // our exports
@@ -87,17 +87,27 @@ function clickable(frame) {
  * `isOver` return. It returns the node.
  */
 function getOver(event, tree, deep) {
-  let node = null;
-  visit(tree, frame => {
-    if (isOver(event, frame)) {
-      node = frame;
+  let frame = null;
+  let treeKeys = [];
+  visit(tree, (node, ancestry) => {
+    if (isOver(event, node)) {
+      frame = node;
+      treeKeys = ancestry.map(frame => frame.key).filter(key => key);
       return false;
     }
   });
-  if (deep && node && node.children && node.children.length) {
-    return getOver(event, { ...node, data: {} }, deep) || node;
+  if (deep && frame && frame.children && frame.children.length) {
+    const overData = getOver(event, { ...frame, data: {} }, deep);
+    return (
+      overData.frame
+      ? { frame: overData.frame, treeKeys: [...treeKeys, ...overData.treeKeys] }
+      : { frame, treeKeys: frame.key ? [ ...treeKeys, frame.key ] : treeKeys }
+    );
   } else { 
-    return node;
+    return {
+      frame,
+      treeKeys: (frame && frame.key) ? [ ...treeKeys, frame.key ] : treeKeys,
+    };
   }
 }
 
@@ -158,4 +168,18 @@ function createDrag(startStream$) {
       stop: () => {}
     });
   });
+}
+
+/**
+ * this creates a stream of mouse events that seem more like clicks than drags
+ */
+function createSingleClick(mousedown$) {
+  return click$ => mousedown$.map(downE => click$
+    .endWhen(xs.periodic(250).take(1))
+    .filter(upE => {
+      if (Math.abs(downE.clientX - upE.clientX) >= 3) return false
+      if (Math.abs(downE.clientY - upE.clientY) >= 3) return false
+      return true;
+    })
+  ).flatten();
 }

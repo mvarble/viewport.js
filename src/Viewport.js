@@ -1,8 +1,8 @@
 /**
- * makeViewportDriver.js
+ * Viewport.js
  *
- * This module exports the Cycle.js driver which allows for declarative 
- * rendering on the canvas.
+ * This module exports the Cycle.js driver/component pair which allow for 
+ * declarative rendering on the canvas.
  */
 
 // module dependencies: npm packages
@@ -16,7 +16,7 @@ import { adapt } from '@cycle/run/lib/adapt';
 import { getOver } from './clicks';
 
 // exports
-export { Viewport, makeViewportDriver, parentDims };
+export { Viewport, ViewportDriver, parentDims };
 
 /**
  * parentDims:
@@ -106,9 +106,9 @@ function withRenderHook(vdom, renderFunc, stateObject) {
  * This is a simple component that appends a hook to the relevant snabbdom and
  * prepares a stream for the ViewportDriver.
  */
-function Viewport({ DOM, state, canvas, render }) {
-  const all$$ = xs.combine(state, canvas, render)
-    .map(([stateObject, vdom, renderFunc]) => {
+function Viewport({ DOM, state, canvas, render, parseDeep }) {
+  const all$$ = xs.combine(state, canvas, render, parseDeep || xs.of(true))
+    .map(([stateObject, vdom, renderFunc, isDeep]) => {
       // if there is no vdom, we cannot do anything
       if (!vdom) return xs.empty();
 
@@ -120,6 +120,7 @@ function Viewport({ DOM, state, canvas, render }) {
             render: renderFunc,
             state: stateObject,
             elm: vdom.elm,
+            isDeep,
           }),
         };
       }
@@ -135,6 +136,7 @@ function Viewport({ DOM, state, canvas, render }) {
           render: renderFunc,
           state: stateObject,
           elm,
+          isDeep,
         })),
       };
     })
@@ -147,7 +149,7 @@ function Viewport({ DOM, state, canvas, render }) {
 }
 
 /**
- * makeViewportDriver:
+ * ViewportDriver:
  *
  * This is a Cycle.js driver which allows us to have a queryable collection of
  * streams corresponding to parsed events on a canvas DOM element. These parsed
@@ -155,28 +157,24 @@ function Viewport({ DOM, state, canvas, render }) {
  * This is done by leveraging the streams of a `MainDOMSource` object from the
  * Cycle.js factory `DOMDriver`.
  */
-function makeViewportDriver(isDeep) {
-  isDeep = typeof isDeep === 'undefined' ? true : isDeep;
+function ViewportDriver(viewport$) {
+  // create the render callback 
+  const next = ({ render, elm, state }) => {
+    if (typeof document !== 'undefined' && document.body.contains(elm)) {
+      render(elm, state);
+    }
+  };
 
-  function driver(viewport$) {
-    // create the render callback 
-    const next = ({ render, elm, state }) => {
-      if (typeof document !== 'undefined' && document.body.contains(elm)) {
-        render(elm, state);
-      }
-    };
+  // add render callback as listener
+  viewport$.addListener({ next });
 
-    // add render callback as listener
-    viewport$.addListener({ next });
-
-    // return the FrameSource
-    return new UnmountedFrameSource(
-      viewport$.map(obj => ({ ...obj.state, scope: obj.scope })),
-      isDeep,
-    );
-  }
-
-  return driver;
+  // return the FrameSource
+  const state$ = viewport$.map(viewport => ({
+    state: viewport.state,
+    _scope: viewport._scope,
+    isDeep: viewport.isDeep
+  }));
+  return new UnmountedFrameSource(state$);
 }
 
 /**
@@ -184,32 +182,22 @@ function makeViewportDriver(isDeep) {
  *
  * An instance of this class is returned by the ViewportDriver.
  */
-const scopeSplit = '___';
-const prependScope = (oldScope, scope) => (
-  scope 
-  ? ((!oldScope || oldScope === '') ? scope : scope + scopeSplit + oldScope)
-  : oldScope
-);
-const appendScope = (oldScope, scope) => (
-  scope 
-  ? ((!oldScope || oldScope === '') ? scope : oldScope + scopeSplit + scope)
-  : oldScope
-);
-const isolateSink = (sink, scope) => sink.map(viewport => ({
-  ...viewport,
-  scope: prependScope(viewport.scope, scope),
-}));
+const unmountedAncestryMessage = 'Do not isolate an `UnmountedFrameSource`' +
+  'instance to a specific branch. Instead, mount this source first!';
 class UnmountedFrameSource {
-  constructor(state$, isDeep, scope) {
+  constructor(state$, scope) {
     this._state$ = state$;
-    this._isDeep = isDeep;
-    this._scope = scope || '';
+    this._scope = scope || [];
     this.isolateSource = (source, scope) => {
-      return new UnmountedFrameSource(
-        source._state$,
-        source._isDeep,
-        appendScope(source._scope, scope),
-      );
+      const isolation = parseIsolationScope(scope);
+      if (isolation.type3) return source; 
+      if (isolation.type1) {
+        return new UnmountedFrameSource(
+          source._state$,
+          appendScope(source._scope, isolation.type1),
+        );
+      }
+      throw new Error(unmountedAncestryMessage);
     };
     this.isolateSink = isolateSink;
   }
@@ -218,9 +206,12 @@ class UnmountedFrameSource {
     return new FrameSourceMaster(
       domSource,
       this._state$,
-      this._isDeep,
       this._scope,
     );
+  }
+
+  select() {
+    throw new Error('You need to mount a `DOMSource` before filtering streams')
   }
 
   events() {
@@ -237,23 +228,26 @@ class UnmountedFrameSource {
  */
 class FrameSourceMaster {
   // our constructor
-  constructor(domSource, state$, isDeep, scope) {
+  constructor(domSource, state$, scope) {
     this._domSource = domSource;
     this._state$ = state$;
-    this._isDeep = isDeep;
-    this._parsedStreams = {};
     this._scope = scope;
-
-    if (typeof window !== 'undefined') {
-      this._resizes$ = xs.merge(xs.of(undefined), fromEvent(window, 'resize'));
-    }
+    this._parsedStreams = {};
 
     this.isolateSource = (source, scope) => {
-      return new FrameSourceMaster(
-        source._domSource,
-        source._state$,
-        source._isDeep,
-        appendScope(source._scope, scope),
+      const isolation = parseIsolationScope(scope);
+      if (isolation.type3) return source;
+      if (isolation.type1) {
+        return new FrameSourceMaster(
+          source._domSource,
+          source._state$,
+          appendScope(source._scope, isolation.type1),
+        );
+      }
+      return new FrameSource(
+        source,
+        () => true,
+        [isolation.type2],
       );
     };
 
@@ -266,20 +260,17 @@ class FrameSourceMaster {
    */
   events(type) {
     if (!this._parsedStreams[type]) {
-      // filter only the states within the scope
-      const state$ = this._state$.filter(state => {
-        if (this._scope === '') return true;
-        if (!state.scope || !state.scope.includes) return false;
-        return state.scope.slice(0, this._scope.length) === this._scope;
-      });
+      // filter the state immediately
+      const state$ = this._state$
+        .filter(({ _scope }) => withinScope(this._scope, _scope))
 
       // leverage the DOMSource events
       this._parsedStreams[type] = this._domSource.events(type)
         .compose(sampleCombine(state$))
-        .filter(([event, state]) => state.scope.includes(this._scope))
-        .map(([event, state]) => {
-          const frame = getOver(event, state, this._isDeep);
+        .map(([event, { state, isDeep }]) => {
+          const { frame, treeKeys } = getOver(event, state, isDeep);
           event.frame = frame;
+          event.treeKeys = treeKeys;
           return event;
         });
     }
@@ -294,7 +285,7 @@ class FrameSourceMaster {
       throw new TypeError('`FrameSource.select` needs a function obj => bool');
       return;
     }
-    return new FrameSource(this, selector)
+    return new FrameSource(this, selector, []);
   }
 
 }
@@ -308,14 +299,26 @@ class FrameSourceMaster {
  * `FrameSource.selector`, which is a function `frame => bool`.
  */
 class FrameSource {
-  constructor(master, selector) {
+  constructor(master, selector, treeKeys) {
     this._master = master;
     this._selector = selector;
+    this._treeKeys = treeKeys;
 
     this.isolateSource = (source, scope) => {
+      const isolation = parseIsolationScope(scope);
+      if (isolation.type3) return source;
+      if (isolation.type1) {
+        const master = new FrameSourceMaster(
+          source._master._domSource,
+          source._master._state,
+          appendScope(source._master._scope, isolation.type1),
+        );
+        return new FrameSource(master, source._selector, source._treeKeys);
+      }
       return new FrameSource(
-        source._master.isolateSource(source._master, scope),
-        source._selector
+        source._master,
+        source._selector,
+        appendScope(source._treeKeys, isolation.type2),
       );
     };
 
@@ -329,12 +332,102 @@ class FrameSource {
     }
     return new FrameSource(
       this._master,
-      frame => this._selector(frame) && selector(frame)
-    )
+      frame => this._selector(frame) && selector(frame),
+      this._treeKeys,
+    );
   }
 
   events(type) {
-    return this._master.events(type)
-      .filter(e => e.frame && this._selector(e.frame));
+    return this._master.events(type).filter(event => (
+      event
+      && this._selector(event.frame)
+      && withinScope(this._treeKeys, event.treeKeys)
+    ));
   }
+}
+
+/**
+ * isolation:
+ *
+ * For isolating ViewportDriver sources/sinks, we have two setups: (1) isolating
+ * different viewports and (2) isolating frames within a single viewport.
+ *
+ * For (1), the source isolation is handled by having a simple string.
+ *
+ * isolate(SomethingWithViewport, 'someScope)
+ *
+ * This string is passed to the `_scope` attribute of the `FrameSource` instance
+ * and the isolation is calculated normally.
+ *
+ * For (2), the source isolation is handled by the `FrameSource` object having
+ * a single property `key`.
+ *
+ * isolate(SomeFrameComponent, { frameSource: { key: 'hisKey' } })
+ * isolate(SomeFrameComponent, { frameSource: '{"key": "hisKey"}' })
+ *
+ * The intention of such isolation is that the `FrameSource` instance will store
+ * an ancestry of all keys `[k1, k2, ..., kn]` added in its `_treeKeys` 
+ * property. From there, the ancestry keys from `getOver` on each event will 
+ * have to contain such isolation keys.
+ *
+ * Note that this isolation in (2) will only work if every frame in the 
+ * unist tree has a `key` property.
+ *
+ * Lastly, no isolation of sinks happens in (2), as frames are not responsible
+ * for returning their own viewports.
+ */
+
+function isNully(object) {
+  const type = typeof object;
+  return !object && type !== 'boolean' && type !== 'number';
+}
+
+const errorString = ( `ViewportDriver isolation requires:
+  (1) a string for viewport scope,
+  (2) an object with attribute 'key' for filtering clicks along the tree,
+  (3) a 'null' or 'undefined' for neither.
+`);
+
+// this function will return an object corresponding to the data of (1) vs (2)
+function parseIsolationScope(scope) {
+  if (isNully(scope)) return { type3: true };
+  if (scope && scope.key) return { type2: scope.key };
+  try {
+    // if JSON.parse works and the object has a key attribute, we assume (2)
+    const object = JSON.parse(scope);
+    if (typeof object.key === 'undefined') { throw new Error(errorString); }
+    return { type2: object.key };
+  } catch (error) {
+    // otherwise, we are in (1), so simply pass the string
+    if (error.name !== 'SyntaxError') { throw error; }
+    return { type1: scope };
+  }
+}
+
+// these functions will simply control string concatenation.
+function prependScope(oldScope, scope) { return [scope, ...(oldScope || [])]; }
+function appendScope(oldScope, scope) { return [...(oldScope || []), scope]; }
+
+// we do not perform sink isolation in (2), as they should not be creating
+// their own viewports.
+function isolateSink(sink, scope) {
+  const isolation = parseIsolationScope(scope);
+  if (isolation.type1) {
+    return sink.map(viewport => ({
+      ...viewport,
+      _scope: prependScope(viewport._scope, isolation.type1),
+    }));
+  } else {
+    return sink;
+  }
+}
+
+// This will see if the sourceScope array is a subset of the streamScope array.
+// Such an event corresponds to the stream with the associated streamScope 
+// "belonging" to the component with the associated sourceScope.
+function withinScope(sourceScope, streamScope) {
+  if (!sourceScope || !sourceScope.length) return true;
+  if (!streamScope || !streamScope.length) return false;
+  return streamScope.slice(0, sourceScope.length)
+    .every((scope, i) => scope === sourceScope[i]);
 }

@@ -3,7 +3,7 @@ const { withState } = require('@cycle/state');
 const isolate = require('@cycle/isolate').default;
 const { makeDOMDriver, h } = require('@cycle/dom');
 const { run } = require('@cycle/run');
-const { makeViewportDriver } = require('../index');
+const { ViewportDriver } = require('../index');
 const app1 = require('./app1');
 const app2 = require('./app2');
 const componentApp = require('./app3');
@@ -39,6 +39,6 @@ function subApp(sources) {
 
 run(withState(app), {
   DOM: makeDOMDriver('#app'),
-  viewport: makeViewportDriver(),
+  viewport: ViewportDriver,
   log: l$ => l$.addListener({ next: console.log }),
 });

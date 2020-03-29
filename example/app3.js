@@ -28,8 +28,19 @@ function createBox(color) {
     type: 'draggable-box',
     worldMatrix: [[10, 0, 128], [0, -10, 128], [0, 0, 1]],
     data: { clickBox: [-1, -1, 1, 1], color },
+    key: color,
   };
 }
+
+/**
+ * view stuff
+ */
+
+function render(canvas, state) {
+  canvas.getContext('2d').clearRect(0, 0, 256, 256);
+  state.children.slice(0).reverse().forEach(box => renderBox(canvas, box));
+}
+
 
 /**
  * our app
@@ -37,9 +48,12 @@ function createBox(color) {
 function app({ DOM, viewport, state }) {
   // intent
   const click$ = DOM.select('button').events('click');
-  const frameSource = viewport.mount(DOM.select('canvas'));
 
   // model
+  const boxesSink = isolate(Boxes, { state: 'children', frameSource: null })({ 
+    state,
+    frameSource: viewport.mount(DOM.select('canvas')),
+  });
   const add$ = click$.compose(sampleCombine(state.stream))
     .map(([_, oldState]) => (state => ({
       ...state,
@@ -48,10 +62,6 @@ function app({ DOM, viewport, state }) {
         createBox(colors[oldState.children.length]),
       ],
     })));
-  const boxesSink = isolate(Boxes, { state: 'children', frameSource: null })({ 
-    state,
-    frameSource,
-  });
   const reducer$ = xs.merge(add$, boxesSink.state)
     .startWith(() => ({ type: 'root', children: [] }));
 
@@ -60,17 +70,7 @@ function app({ DOM, viewport, state }) {
     attrs: { width: 256, height: 256 },
     style: { border: '3px solid black' },
   }));
-  const render$ = boxesSink.render.map(renderFuncs => {
-    return (canvas, state) => {
-      canvas.getContext('2d').clearRect(0, 0, 256, 256);
-      const L = renderFuncs.length;
-      renderFuncs.slice().reverse().forEach((renderFunc, i) => {
-        if (state.children && state.children[L-i-1]) {
-          renderFunc(canvas, state.children[L-i-1]);
-        }
-      });
-    };
-  });
+  const render$ = xs.of(render);
   const viewportSink = Viewport({
     DOM,
     canvas: canvas$,
@@ -126,33 +126,21 @@ function renderBox(canvas, frame) {
 
 function Box({ state, frameSource }) {
   // intent
-  const click$ = state.stream.map(box => (
-    frameSource
-    .select(frame => frame && frame.data.color === box.data.color)
-    .events('mousedown')
-  )).take(1).flatten();
-  const drag$ = createDrag(click$).flatten();
+  const drag$ = createDrag(frameSource.events('mousedown')).flatten();
 
   // model
   const reducer$ = drag$.map(event => (state => update(state, event)));
 
-  // view
-  const render$ = xs.of(renderBox)
-
-  return {
-    state: reducer$,
-    render: render$
-  };
+  return { state: reducer$ };
 }
 
 function Boxes(sources) {
   return makeCollection({
     item: Box,
     itemKey: childState => childState.data.color,
-    itemScope: key => ({ state: key, frameSource: null }),
+    itemScope: key => ({ state: key, frameSource: { key } }),
     collectSinks: instances => ({
       state: instances.pickMerge('state'),
-      render: instances.pickCombine('render'),
     }),
   })(sources);
 }
