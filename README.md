@@ -105,7 +105,7 @@ viewportSink = Viewport({ state, canvas, render, isDeep })
 This is a Cycle.js component that takes a state stream `state`, a snabbdom stream `canvas`, and a stream of imperative render functions `render`.
 With these streams, it returns sink `viewportSink` with streams `viewportSink.viewport` and `viewportSink.DOM`.
 
-The `viewportSink.viewport` stream exists to declare the render state for the [ViewportDriver](#viewport-driver).
+The `viewportSink.viewport` stream exists to declare the render state for the [ViewportDriver](#viewportdriver).
 
 The `viewportSink.DOM` stream is nothing but the original stream `canvas`, but an insert hook is appended for each update of `canvas` and `render` so that the appropriate render will occur on insertion.
 This stream is to be used to build the DOM (as opposed to the original `canvas` stream) so that the render will still occur if the DOM element is not created by the time the `viewportSink.viewport` stream hits the `ViewportDriver`.
@@ -123,7 +123,7 @@ The input stream `viewport$` above is a stream of objects with the declared stat
 
 The output object `frameSource` is an instance of the `UnmountedFrameSource` class.
 If you would like to parse clicks on the canvas, you must start with leveraging the event queries of the `DOMDriver` by doing `frameSource.mount(DOM.select(cssSelector))`, where `cssSelector` is a tag suitable for identifying the canvas element on which you rendered, and `DOM` is a reference to the `MainDOMSource` exported by the `DOMDriver`.
-The `UnmountedFrameSource.mount` method returns a (mounted) [FrameSource](#frame-source), which can be used for parsing clicks on the canvas.
+The `UnmountedFrameSource.mount` method returns a (mounted) [FrameSource](#framesource), which can be used for parsing clicks on the canvas.
 
 ### FrameSource
 
@@ -187,53 +187,6 @@ See the [example here](https://github.com/mvarble/viewport.js/blob/master/exampl
 
 Along with the component/driver pair that this package exports, we also have a couple of utilities that are repeatedly used in parsing clicks and resizes on the viewport.
 
-#### parentDims
-
-```js
-parentDims$ = canvasDOM$.compose(parentDims)
-```
-
-This is an [xstream](https://github.com/staltz/xstream) operator that maps a stream `canvasDOM$` to the `[offsetWidth, offsetHeight]` resizes of its parent.
-
-> **Warning.** If you declare the canvas size dependent on this stream (and make your imperative render function resize accordingly) and the parent does not have fixed sizing, you may cause an indefinite loop of 
->
-> parent dimensions change &rarr; parentDims update &rarr; canvas dimensions change &rarr; parent change &rarr; ...
->
-> so tread lightly with setting the parent's dimensions in some fixed way (say, with CSS `vw` and `vh`).
-
-#### createDrag
-
-```js
-drag$ = createDrag(mousedown$)
-```
-
-This is a [xstream](https://github.com/staltz/xstream) operator that takes a stream of `mousedown` events and returns a stream of streams that match the following diagram.
-
-```
-mousedown: |-----x-------------------x------------->
-
-        (createDrag)
-
-mousemove: |-x-------x--x-x----x------------------->
-mouseup:   |----------------o-------------o-------->
-
-output:    |-----x-------------------x------------->
-                   \                   \
-                    --x--x-x-o-|        -----|
-```
-
-Note that every stream starts with a `mousedown` event, and ends with the `mouseup` event.
-The streams will always output `mousemove` and `mouseup` events from the document, _not_ the DOM element that the `mousedown` events corresponded to.
-However, each of these events will have an `isDrag` attribute which will point to the reference of the original `mousedown` event.
-Also, these streams are not provided as arguments of the operator; they are just in the diagram for explanation.
-
-Note in the example above, we have that the output streams will be empty if no `mousemove` occurs between 'mousedown' and 'mouseup' events.
-The rationale behind this is that:
-
-1. Clicks are not drags
-2. Every nonempty drag starts with a 'mousemove'.
-3. Every nonempty drag ends with a 'mouseup'. 
-
 #### relativeMousePosition
 
 ```js
@@ -241,7 +194,7 @@ The rationale behind this is that:
 ```
 
 This function calculates the bounding rectangle of the `event` target and calculates the mouse position relative to this.
-If the `isDrag` attribute from [createDrag](#createdrag) is present in the event, `event.isDrag.target` is used instead of `event.target`.
+If the `isDrag` attribute from [createDrag](https://github.com/mvarble/viewport-utilities#createdrag) is present in the event, `event.isDrag.target` is used instead of `event.target`.
 
 #### isOver
 

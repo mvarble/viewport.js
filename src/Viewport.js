@@ -16,22 +16,7 @@ import { adapt } from '@cycle/run/lib/adapt';
 import { getOver } from './clicks';
 
 // exports
-export { Viewport, ViewportDriver, parentDims };
-
-/**
- * parentDims:
- *
- * This is an xstream operator that will take a stream of elements, and return
- * a stream of [offsetWidth, offsetHeight] parent resizes.
- */
-function parentDims(element$) {
-  const resizes$ = xs.merge(xs.of(undefined), fromEvent(window, 'resize'));
-  return xs.combine(element$, resizes$)
-    .filter(([el]) => el && el.parentNode)
-    .map(([el]) => [el.parentNode.offsetWidth, el.parentNode.offsetHeight])
-    .compose(dropRepeats(([a, b], [c, d]) => a === c && b === d));
-}
-
+export { Viewport, ViewportDriver };
 
 // these are boolean functions that help us determine the state of a snabbdom
 // vdom

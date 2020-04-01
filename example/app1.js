@@ -12,7 +12,8 @@ const {
   vecFrameTrans,
 } = require('@mvarble/frames.js');
 const sampleCombine = require('xstream/extra/sampleCombine').default;
-const { Viewport, createDrag, relativeMousePosition } = require('../index');
+const { createDrag } = require('@mvarble/viewport-utilities');
+const { Viewport, relativeMousePosition } = require('../index');
 
 // our export
 module.exports = app;

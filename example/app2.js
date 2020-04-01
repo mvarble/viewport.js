@@ -4,7 +4,8 @@
 
 const xs = require('xstream').default;
 const { h } = require('@cycle/dom');
-const { Viewport, createDrag } = require('../index');
+const { createDrag } = require('@mvarble/viewport-utilities');
+const { Viewport } = require('../index');
 const {
   locsFrameTrans,
   identityFrame,

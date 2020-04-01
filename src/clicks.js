@@ -12,7 +12,7 @@ import visit from 'unist-util-visit-parents';
 import { locFrameTrans, identityFrame } from '@mvarble/frames.js';
 
 // our exports
-export { relativeMousePosition, isOver, getOver, createDrag };
+export { relativeMousePosition, isOver, getOver };
 
 /**
  * relativeMousePosition:
@@ -111,75 +111,3 @@ function getOver(event, tree, deep) {
   }
 }
 
-/**
- * createDrag
- *
- * This is a xstream operator that takes a stream of 'mousedown' events and 
- * returns a stream of streams that match the following diagram.
- *
- * mousedown: |-----x-------------------x------------->
- *
- * (createDrag)
- *
- * mousemove: |-x-------x--x-x----x------------------->
- * mouseup:   |----------------o-------------o-------->
- *
- * output:    |-----x-------------------x------------->
- *                   \                   \
- *                    --x--x-x-o-|        -----|
- *
- * Note that every stream starts with a 'mousedown' event, and ends with the 
- * 'mouseup' event. The streams will always output 'mousemove' and 'mouseup' 
- * events from the document (not by DOM element that triggered 'mousedown').
- * Note in the example above, we have that the output streams will be empty
- * if no 'mousemove' occurs between 'mousedown' and 'mouseup' events. Thus
- *   
- *   (1) Clicks are not drags
- *   (2) Every nonempty drag starts with a 'mousemove'.
- *   (3) Every nonempty drag ends with a 'mouseup'. 
- */
-const appendDrag = (e, e1) => {
-  e1.isDrag = e;
-  return e1;
-};
-
-function createDrag(startStream$) {
-  // if there is no document, we return an empty stream
-  if (typeof document === 'undefined') return xs.empty();
-
-  // create the output stream
-  return startStream$.map(e => {
-    const move$ = fromEvent(document, 'mousemove').map(e1 => appendDrag(e, e1));
-    const up$ = fromEvent(document, 'mouseup').map(e1 => appendDrag(e, e1));
-    return xs.create({
-      start: listener => {
-        let hasMoved = false;
-        xs.merge(move$.endWhen(up$), up$.take(1)).addListener({
-          next: e => {
-            if (e.type === 'mousemove' || hasMoved) {
-              hasMoved = true;
-              listener.next(e);
-            }
-          },
-          error: err => listener.error(err),
-          complete: () => listener.complete(),
-        });
-      },
-      stop: () => {}
-    });
-  });
-}
-
-/**
- * this creates a stream of mouse events that seem more like clicks than drags
- */
-function createSingleClick(mousedown$) {
-  return click$ => mousedown$.map(downE => click$
-    .endWhen(xs.periodic(250).take(1))
-    .filter(upE => {
-      if (Math.abs(downE.clientX - upE.clientX) >= 3) return false
-      if (Math.abs(downE.clientY - upE.clientY) >= 3) return false
-      return true;
-    })
-  ).flatten();
-}

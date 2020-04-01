@@ -7,7 +7,8 @@ const sampleCombine = require('xstream/extra/sampleCombine').default;
 const { h } = require('@cycle/dom');
 const { makeCollection } = require('@cycle/state');
 const isolate = require('@cycle/isolate').default;
-const { Viewport, createDrag } = require('../index');
+const { createDrag } = require('@mvarble/viewport-utilities');
+const { Viewport } = require('../index');
 const {
   locsFrameTrans,
   identityFrame,
