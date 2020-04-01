@@ -1,6 +1,5 @@
 import { Viewport, ViewportDriver } from './Viewport';
 import {
-  relativeMousePosition,
   isOver,
   getOver,
 } from './clicks';
@@ -8,7 +7,6 @@ import {
 export {
   Viewport,
   ViewportDriver,
-  relativeMousePosition,
   isOver,
   getOver,
 };
@@ -16,7 +14,6 @@ export {
 export default {
   Viewport,
   ViewportDriver,
-  relativeMousePosition,
   isOver,
   getOver,
 };

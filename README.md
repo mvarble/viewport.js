@@ -187,15 +187,6 @@ See the [example here](https://github.com/mvarble/viewport.js/blob/master/exampl
 
 Along with the component/driver pair that this package exports, we also have a couple of utilities that are repeatedly used in parsing clicks and resizes on the viewport.
 
-#### relativeMousePosition
-
-```js
-[x, y] = relativeMousePosition(event)
-```
-
-This function calculates the bounding rectangle of the `event` target and calculates the mouse position relative to this.
-If the `isDrag` attribute from [createDrag](https://github.com/mvarble/viewport-utilities#createdrag) is present in the event, `event.isDrag.target` is used instead of `event.target`.
-
 #### isOver
 
 ```js

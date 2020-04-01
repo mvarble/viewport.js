@@ -6,6 +6,7 @@
   "dependencies": {
     "@cycle/run": "^5.4.0",
     "@mvarble/frames.js": "^1.0.7",
+    "@mvarble/viewport-utilities": "^1.0.3",
     "unist-util-visit-parents": "^3.0.2",
     "xstream": "^11.11.0"
   },
@@ -14,7 +15,6 @@
     "@babel/preset-env": "^7.8.7",
     "@cycle/state": "^1.4.0",
     "@cycle/time": "^0.20.0",
-    "@mvarble/viewport-utilities": "^1.0.0",
     "babel-loader": "^8.0.6",
     "browserify": "^16.5.0",
     "webpack": "^4.42.0",
@@ -27,9 +27,6 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mvarble/viewport.js.git"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
   },
   "keywords": [
     "canvas",
